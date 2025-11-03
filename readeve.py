@@ -2,46 +2,69 @@ import numpy as np
 import tifffile
 
 
-filename = f'data/recording_2025-04-04_12-41-35.npy'
-new_filename = f'data/recording_2025-04-04_12-41-35.npz'
-imagename = f'data/recording_2025-04-04_12-41-35_image.npz'
+filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npy'
+new_filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npz'
+imagename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events_image.npz'
+
 """
 data = np.load(filename)
-data = np.array([[x, y, p, t] for (x, y, p, t) in data], dtype=np.uint32)
-np.savez(new_filename, data=data)
+nb_data = len(data)
+polarity = np.empty(nb_data, dtype=np.bool_)
+time_stamps = np.empty(nb_data, dtype=np.uint32)
+xs = np.empty(nb_data, dtype=np.uint16)
+ys = np.empty(nb_data, dtype=np.uint16)
+
+def fun(data):
+    cnt = 0
+    len_data = len(data)
+    while cnt < len_data:
+        yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
+        cnt += 1
+
+for idx, (pol, t, y, x) in enumerate(fun(data)):
+    polarity[idx] = pol
+    time_stamps[idx] = t
+    ys[idx] = y
+    xs[idx] = x
+np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 """
 
 
+data = np.load(new_filename)
+xs = data['x']
+ys = data['y']
+ts = data['time_stamps']
+ps = data['polarity']
+print(data['x'])
+x_min = np.min(xs)
+x_max = np.max(xs)
+y_min = np.min(ys)
+y_max = np.max(ys)
+polarity_min = np.min(ps)
+polarity_max = np.max(ps)
+t_min = np.min(ts)
+t_max = np.max(ts)
 
-data = np.load(new_filename)['data']
-
-x_min = np.min(data[:, 0])
-x_max = np.max(data[:, 0])
-y_min = np.min(data[:, 1])
-y_max = np.max(data[:, 1])
-polarity_min = np.min(data[:, 2])
-polarity_max = np.max(data[:, 2])
-t_min = np.min(data[:, 3])
-t_max = np.max(data[:, 3])
-
-data[:, 0] = data[:, 0] - x_min
-data[:, 1] = data[:, 1] - y_min
-print(np.max(data[:, 1]), y_min, y_max)
+xs = xs - x_min
+ys = ys - y_min
+print(np.max(ys), y_min, y_max)
 timebin = 10000
 grid = np.zeros(((int(t_max / timebin) + 1), (y_max - y_min + 1), (x_max - x_min + 1) * 2), dtype=np.uint8)
 print(grid.shape)
-for dt in data:
-    polarity = dt[2]
+for x, y, p, t in zip(xs, ys, ts, ps):
+    polarity = p
+
     if polarity == 1:
-        grid[int(dt[3] / timebin), dt[1], dt[0]] += 1
+        grid[int(t / timebin), y, x] += 1
     else:
-        grid[int(dt[3] / timebin), dt[1], grid.shape[1]//2 + dt[0]] += 1
+        grid[int(t / timebin), y, grid.shape[1]//2 + x] += 1
 print(x_min, x_max, y_min, y_max, polarity_min, polarity_max, t_min, t_max)
 print(grid.shape)
 #grid = np.swapaxes(grid, axis1, axis2)[source]
 
 np.savez(imagename, data=grid)
 
+print('saved')
 data = np.load(imagename)['data']
 print(data, data.dtype)
 tifffile.imwrite(f'./video.tiff', data=data, imagej=True)
