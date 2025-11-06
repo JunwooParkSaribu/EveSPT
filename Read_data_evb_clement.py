@@ -34,14 +34,14 @@ from matplotlib import animation
 import matplotlib
 import imageio
 from PIL import Image
-from metavision_core.event_io.raw_reader import RawReader
+#from metavision_core.event_io.raw_reader import RawReader
 
 #-----------------------------------------------------------------------------
 # USER DEFINED PARAMETERS
 #-----------------------------------------------------------------------------
 
 # Import parameters
-filepath='C:/absolute/path/to/data/AF647_coverslip.raw'
+filepath='eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npy'
 buffer_size=1e8                 # increase the buffer size if the input file is too large to be loaded. Decrease the buffer size if the PC is out of memory. Tested successfully with buffer size = 4e9 for 128 Gb of memory
 
 # General filtering parameters
@@ -81,7 +81,7 @@ frame_size=[1280,720]            # Size of the sensor array (in pixels) [x,y]
 # Data loading
 print('Loading data...')
 if filepath[-4:]=='.raw':
-    record_raw = RawReader(filepath,max_events=int(buffer_size))
+    record_raw = None#RawReader(filepath,max_events=int(buffer_size))
     sums = 0
     while not record_raw.is_done() and record_raw.current_event_index() < buffer_size:
         events = record_raw.load_delta_t(50000)
