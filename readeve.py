@@ -35,36 +35,31 @@ xs = data['x']
 ys = data['y']
 ts = data['time_stamps']
 ps = data['polarity']
-print(data['x'])
+
 x_min = np.min(xs)
-x_max = np.max(xs)
 y_min = np.min(ys)
-y_max = np.max(ys)
-polarity_min = np.min(ps)
-polarity_max = np.max(ps)
-t_min = np.min(ts)
-t_max = np.max(ts)
 
 xs = xs - x_min
 ys = ys - y_min
-print(np.max(ys), y_min, y_max)
-timebin = 100000
-grid = np.zeros(((int(t_max / timebin) + 1), (y_max - y_min + 1), (x_max - x_min + 1) * 2), dtype=np.uint8)
-print(grid.shape)
-for x, y, p, t in zip(xs, ys, ts, ps):
-    polarity = p
+x_max = np.max(xs)
+y_max = np.max(ys)
+t_max = np.max(ts)
 
+timebin = 100000
+grid = np.zeros(((int(t_max / timebin) + 1), (y_max + 1), (x_max + 1) * 2), dtype=np.uint8)
+
+for x, y, t, p in zip(xs, ys, ts, ps):
+    polarity = p
     if polarity == 1:
         grid[int(t / timebin), y, x] += 1
     else:
-        grid[int(t / timebin), y, grid.shape[1]//2 + x] += 1
-print(x_min, x_max, y_min, y_max, polarity_min, polarity_max, t_min, t_max)
-print(grid.shape)
-#grid = np.swapaxes(grid, axis1, axis2)[source]
+        grid[int(t / timebin), y, grid.shape[2]//2 + x] += 1
 
+
+print(grid.shape)
 np.savez(imagename, data=grid)
 
 print('saved')
-data = np.load(imagename)['data'][:500,:,:]
+data = np.load(imagename)['data'][:5000,:,:]
 print(data, data.dtype)
 tifffile.imwrite(f'./video.tiff', data=data, imagej=True)
