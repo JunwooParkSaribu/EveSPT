@@ -45,6 +45,9 @@ x_max = np.max(xs)
 y_max = np.max(ys)
 t_max = np.max(ts)
 
+print(ts)
+
+"""
 timebin = 100000
 grid = np.zeros(((int(t_max / timebin) + 1), (y_max + 1), (x_max + 1) * 2), dtype=np.uint8)
 
@@ -59,7 +62,8 @@ for x, y, t, p in zip(xs, ys, ts, ps):
 print(grid.shape)
 np.savez(imagename, data=grid)
 
-print('saved')
+
 data = np.load(imagename)['data'][:5000,:,:]
 print(data, data.dtype)
 tifffile.imwrite(f'./video.tiff', data=data, imagej=True)
+"""
