@@ -1,10 +1,11 @@
 import numpy as np
 import tifffile
+import matplotlib.pyplot as plt
+from itertools import product
 
-
-filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npy'
-new_filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npz'
-imagename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events_image.npz'
+filename = f'eve_data/Experimental/2022-12-08/recording_2022-12-08T19-47-03.127Z.npy'
+new_filename = f'eve_data/Experimental/2022-12-08/Events.npz'
+imagename = f'eve_data/Experimental/2022-12-08/Events_image.npz'
 
 """
 data = np.load(filename)
@@ -21,20 +22,22 @@ def fun(data):
         yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
         cnt += 1
 
-for idx, (pol, t, y, x) in enumerate(fun(data)):
-    polarity[idx] = pol
+#for idx, (x, y, p, t) in enumerate(fun(data)):
+for idx, (p, t, y, x) in enumerate(fun(data)):
+    polarity[idx] = p
     time_stamps[idx] = t
     ys[idx] = y
     xs[idx] = x
 np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 """
 
+size = 5000000000000000
 
 data = np.load(new_filename)
-xs = data['x']
-ys = data['y']
-ts = data['time_stamps']
-ps = data['polarity']
+xs = data['x'][:size]
+ys = data['y'][:size]
+ts = data['time_stamps'][:size]
+ps = data['polarity'][:size]
 
 x_min = np.min(xs)
 y_min = np.min(ys)
@@ -45,7 +48,26 @@ x_max = np.max(xs)
 y_max = np.max(ys)
 t_max = np.max(ts)
 
-print(ts)
+
+diff_ts_concat = []
+for arr_x, arr_y in product(range(len(xs)), range(len(ys))):
+
+    indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
+
+    target_ts = ts[indices].astype(np.int32)
+    target_ps = ps[indices].astype(np.int32)
+
+    diff_ts = abs(np.diff(target_ts))
+    diff_ts_concat.extend(list(diff_ts))
+
+diff_ts_concat = np.array(diff_ts_concat)
+print(diff_ts_concat)
+
+plt.figure()
+plt.hist(diff_ts_concat)
+plt.show()
+#array_ = xs[:,0]
+
 
 """
 timebin = 100000
@@ -65,5 +87,5 @@ np.savez(imagename, data=grid)
 
 data = np.load(imagename)['data'][:5000,:,:]
 print(data, data.dtype)
-tifffile.imwrite(f'./video.tiff', data=data, imagej=True)
+tifffile.imwrite(f'eve_data/Experimental/2022-12-08/video.tiff', data=data, imagej=True)
 """
