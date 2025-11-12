@@ -50,24 +50,32 @@ t_max = np.max(ts)
 
 
 diff_ts_concat = []
-for arr_x, arr_y in product(range(0, x_max), range(0, y_max)):
-    #arr_x = 328
-    #arr_y = 238
-    if arr_x > 20:
-        break
+"""
+#signal included roi
+xrange = np.arange(376, 448)
+yrange = np.arange(193, 256)
+"""
+
+#signal excluded roi
+xrange = np.arange(430, 494)
+yrange = np.arange(422, 481)
+
+for arr_x, arr_y in product(xrange, yrange):
     indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
 
     target_ts = ts[indices].astype(np.int32)
     target_ps = ps[indices].astype(np.int32)
 
+
     diff_ts = abs(np.diff(target_ts))
     diff_ts_concat.extend(list(diff_ts))
 
-diff_ts_concat = np.array(diff_ts_concat)
+diff_ts_concat = np.array(diff_ts_concat) / 1000.
 print(diff_ts_concat)
 
 plt.figure()
-plt.hist(diff_ts_concat)
+plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 100))
+plt.savefig('1.png')
 plt.show()
 #array_ = xs[:,0]
 

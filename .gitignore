@@ -40,6 +40,7 @@ error_log.txt
 # Result Files #
 ######################
 data
+eve_data
 *.tiff
 
 
