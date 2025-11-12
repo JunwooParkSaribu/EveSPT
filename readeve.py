@@ -53,7 +53,8 @@ diff_ts_concat = []
 for arr_x, arr_y in product(range(0, x_max), range(0, y_max)):
     #arr_x = 328
     #arr_y = 238
-    
+    if arr_x > 20:
+        break
     indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
 
     target_ts = ts[indices].astype(np.int32)
