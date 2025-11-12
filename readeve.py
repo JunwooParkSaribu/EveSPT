@@ -14,7 +14,7 @@ polarity = np.empty(nb_data, dtype=np.bool_)
 time_stamps = np.empty(nb_data, dtype=np.uint32)
 xs = np.empty(nb_data, dtype=np.uint16)
 ys = np.empty(nb_data, dtype=np.uint16)
-
+print(data.dtype)
 def fun(data):
     cnt = 0
     len_data = len(data)
@@ -22,8 +22,8 @@ def fun(data):
         yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
         cnt += 1
 
-#for idx, (x, y, p, t) in enumerate(fun(data)):
-for idx, (p, t, y, x) in enumerate(fun(data)):
+for idx, (x, y, p, t) in enumerate(fun(data)):
+#for idx, (p, t, y, x) in enumerate(fun(data)):
     polarity[idx] = p
     time_stamps[idx] = t
     ys[idx] = y
@@ -50,8 +50,10 @@ t_max = np.max(ts)
 
 
 diff_ts_concat = []
-for arr_x, arr_y in product(range(len(xs)), range(len(ys))):
-
+for arr_x, arr_y in product(range(0, x_max), range(0, y_max)):
+    #arr_x = 328
+    #arr_y = 238
+    
     indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
 
     target_ts = ts[indices].astype(np.int32)
@@ -67,6 +69,7 @@ plt.figure()
 plt.hist(diff_ts_concat)
 plt.show()
 #array_ = xs[:,0]
+
 
 
 """
