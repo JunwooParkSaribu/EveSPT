@@ -3,9 +3,11 @@ import tifffile
 import matplotlib.pyplot as plt
 from itertools import product
 
-filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npy'
-new_filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npz'
-imagename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events_image.npz'
+path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.01, 0.1] background_level=50.0"
+filename = f"{path}/Events.npy"
+new_filename = f"{path}/Events.npz"
+imagename = f"{path}/Events_image.npz"
+gt = f"{path}/Tracks_GT.npy"
 
 """
 data = np.load(filename)
@@ -29,6 +31,17 @@ for idx, (p, t, y, x) in enumerate(fun(data)):
     ys[idx] = y
     xs[idx] = x
 np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
+"""
+"""
+gt_data = np.load(gt)
+print(gt_data)
+gt_xranges = []
+gt_yranges = []
+gt_tranges = []
+for gt_d in gt_data:
+    gt_xranges.append([max(0, gt_d[4] - 10), gt_d[4] + 10])
+    gt_yranges.append([max(0, gt_d[3] - 10), gt_d[3] + 10])
+    gt_tranges.append([max(0, gt_d[2] - 2000), gt_d[3] + 2000])
 """
 
 upper_t_limit = 50000000 # 50sec
@@ -58,50 +71,71 @@ t_max = np.max(ts)
 
 diff_ts_concat = []
 positive_to_negative = []
-
+"""
 #all
-xrange = np.arange(0, x_max)
-yrange = np.arange(0, y_max)
-
-"""
-#signal included roi
-xrange = np.arange(376, 448)
-yrange = np.arange(193, 256)
+xrange = np.arange(0, 50)
+yrange = np.arange(0, 50)
 """
 """
-#signal excluded roi
-xrange = np.arange(430, 494)
-yrange = np.arange(422, 481)
+#signal included ROIs
+xranges = [np.arange(348, 364),
+           np.arange(232, 248)
+           ]
+yranges = [np.arange(252, 268),
+           np.arange(113, 129)
+           ]
+tranges = [[0, 500000],
+           [12800000, 14000000],
+           ]
 """
 
-for arr_x, arr_y in product(xrange, yrange):
-    indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
+#signal excluded ROIs
+xranges = [np.arange(0, 45),
+           np.arange(0, 45)
+           ]
+yranges = [np.arange(0, 45),
+           np.arange(474, 516)
+           ]
+tranges = [[0, 10000000],
+           [0, 10000000],
+           ]
 
-    target_ts = ts[indices].astype(np.int32)
-    target_ps = ps[indices].astype(np.int32)
 
+for xrange, yrange, trange in zip(xranges, yranges, tranges):
+    for arr_x, arr_y in product(xrange, yrange):
+        indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
 
-    positive_args = np.argwhere(target_ps == 1).flatten()
-    negative_args = np.argwhere(target_ps == 0).flatten()
+        target_ts = ts[indices].astype(np.int32)
+        target_ps = ps[indices].astype(np.int32)
 
-    positive_ts = target_ts[positive_args]
-    negative_ts = target_ts[negative_args]
+        roi_ts = np.argwhere((trange[0] < target_ts) & (target_ts < trange[1])).flatten()
+        
+        target_ts = target_ts[roi_ts]
+        target_ps = target_ps[roi_ts]
 
-    #if len(target_ts) >= 2:
-    #    target_ts = target_ts[target_ps]
+        positive_args = np.argwhere(target_ps == 1).flatten()
+        negative_args = np.argwhere(target_ps == 0).flatten()
 
-    diff_ts = abs(np.diff(target_ts))
-    diff_ts_concat.extend(list(diff_ts))
+        positive_ts = target_ts[positive_args]
+        negative_ts = target_ts[negative_args]
 
-    for positive_t in positive_ts:
-        for negative_t in negative_ts:
-            if negative_t > positive_t:
-                positive_to_negative.append(negative_t - positive_t)
+        #if len(target_ts) >= 2:
+        #    target_ts = target_ts[target_ps]
+
+        diff_ts = abs(np.diff(target_ts))
+        diff_ts_concat.extend(list(diff_ts))
+
+        for positive_t in positive_ts:
+            for negative_t in negative_ts:
+                if negative_t > positive_t:
+                    positive_to_negative.append(negative_t - positive_t)
+                
 
 
 diff_ts_concat = np.array(diff_ts_concat) / 1000.
 positive_to_negative = np.array(positive_to_negative) / 1000.
-print(diff_ts_concat)
+print(positive_ts, negative_ts)
+print(positive_to_negative)
 
 plt.figure()
 plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 10))
@@ -134,5 +168,5 @@ np.savez(imagename, data=grid)
 
 data = np.load(imagename)['data'][:10000,:,:]
 print(data, data.dtype)
-tifffile.imwrite(f'eve_data/Experimental/2022-12-08/video.tiff', data=data, imagej=True)
+tifffile.imwrite(f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video.tiff', data=data, imagej=True)
 """
