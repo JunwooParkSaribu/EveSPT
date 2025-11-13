@@ -50,15 +50,23 @@ t_max = np.max(ts)
 
 
 diff_ts_concat = []
+positive_to_negative = []
+
+
+#all
+xrange = np.arange(0, x_max)
+yrange = np.arange(0, y_max)
+
 """
 #signal included roi
 xrange = np.arange(376, 448)
 yrange = np.arange(193, 256)
 """
-
+"""
 #signal excluded roi
 xrange = np.arange(430, 494)
 yrange = np.arange(422, 481)
+"""
 
 for arr_x, arr_y in product(xrange, yrange):
     indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
@@ -67,22 +75,43 @@ for arr_x, arr_y in product(xrange, yrange):
     target_ps = ps[indices].astype(np.int32)
 
 
+    positive_args = np.argwhere(target_ps == 1).flatten()
+    negative_args = np.argwhere(target_ps == 0).flatten()
+
+    positive_ts = target_ts[positive_args]
+    negative_ts = target_ts[negative_args]
+
+    #if len(target_ts) >= 2:
+    #    target_ts = target_ts[target_ps]
+
     diff_ts = abs(np.diff(target_ts))
     diff_ts_concat.extend(list(diff_ts))
 
+    for positive_t in positive_ts:
+        for negative_t in negative_ts:
+            if negative_t > positive_t:
+                positive_to_negative.append(negative_t - positive_t)
+
+
 diff_ts_concat = np.array(diff_ts_concat) / 1000.
+positive_to_negative = np.array(positive_to_negative) / 1000.
 print(diff_ts_concat)
 
 plt.figure()
-plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 100))
+plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 10))
 plt.savefig('1.png')
+
+plt.figure()
+plt.hist(positive_to_negative, bins=np.arange(0, 10000, 10))
+plt.savefig('2.png')
 plt.show()
 #array_ = xs[:,0]
 
 
 
+
 """
-timebin = 100000
+timebin = 10000
 grid = np.zeros(((int(t_max / timebin) + 1), (y_max + 1), (x_max + 1) * 2), dtype=np.uint8)
 
 for x, y, t, p in zip(xs, ys, ts, ps):
@@ -97,7 +126,7 @@ print(grid.shape)
 np.savez(imagename, data=grid)
 
 
-data = np.load(imagename)['data'][:5000,:,:]
+data = np.load(imagename)['data'][:10000,:,:]
 print(data, data.dtype)
 tifffile.imwrite(f'eve_data/Experimental/2022-12-08/video.tiff', data=data, imagej=True)
 """
