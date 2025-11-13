@@ -3,9 +3,9 @@ import tifffile
 import matplotlib.pyplot as plt
 from itertools import product
 
-filename = f'eve_data/Experimental/2022-12-08/recording_2022-12-08T19-47-03.127Z.npy'
-new_filename = f'eve_data/Experimental/2022-12-08/Events.npz'
-imagename = f'eve_data/Experimental/2022-12-08/Events_image.npz'
+filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npy'
+new_filename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events.npz'
+imagename = f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/Events_image.npz'
 
 """
 data = np.load(filename)
@@ -22,8 +22,8 @@ def fun(data):
         yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
         cnt += 1
 
-for idx, (x, y, p, t) in enumerate(fun(data)):
-#for idx, (p, t, y, x) in enumerate(fun(data)):
+#for idx, (x, y, p, t) in enumerate(fun(data)):
+for idx, (p, t, y, x) in enumerate(fun(data)):
     polarity[idx] = p
     time_stamps[idx] = t
     ys[idx] = y
@@ -31,13 +31,20 @@ for idx, (x, y, p, t) in enumerate(fun(data)):
 np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 """
 
-size = 5000000000000000
+upper_t_limit = 50000000 # 50sec
 
 data = np.load(new_filename)
-xs = data['x'][:size]
-ys = data['y'][:size]
-ts = data['time_stamps'][:size]
-ps = data['polarity'][:size]
+xs = data['x']
+ys = data['y']
+ts = data['time_stamps']
+ps = data['polarity']
+
+selected_args = np.argwhere(ts < upper_t_limit).flatten()
+xs = xs[selected_args]
+ys = ys[selected_args]
+ts = ts[selected_args]
+ps = ps[selected_args]
+
 
 x_min = np.min(xs)
 y_min = np.min(ys)
@@ -51,7 +58,6 @@ t_max = np.max(ts)
 
 diff_ts_concat = []
 positive_to_negative = []
-
 
 #all
 xrange = np.arange(0, x_max)
