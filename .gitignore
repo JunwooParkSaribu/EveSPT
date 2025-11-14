@@ -41,8 +41,9 @@ error_log.txt
 ######################
 data
 eve_data
+asaki_data
 *.tiff
-
+*.tif
 
 # OS generated files #
 ######################

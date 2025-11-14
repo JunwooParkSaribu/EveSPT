@@ -3,7 +3,7 @@ import tifffile
 import matplotlib.pyplot as plt
 from itertools import product
 
-path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.01, 0.1] background_level=50.0"
+path = f"eve_data/Experimental/2022-12-08"
 filename = f"{path}/Events.npy"
 new_filename = f"{path}/Events.npz"
 imagename = f"{path}/Events_image.npz"
@@ -32,19 +32,24 @@ for idx, (p, t, y, x) in enumerate(fun(data)):
     xs[idx] = x
 np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 """
+
+
+upper_t_limit = 50000000 # 50sec
+
 """
 gt_data = np.load(gt)
-print(gt_data)
 gt_xranges = []
 gt_yranges = []
 gt_tranges = []
 for gt_d in gt_data:
-    gt_xranges.append([max(0, gt_d[4] - 10), gt_d[4] + 10])
-    gt_yranges.append([max(0, gt_d[3] - 10), gt_d[3] + 10])
-    gt_tranges.append([max(0, gt_d[2] - 2000), gt_d[3] + 2000])
+    if gt_d[2] < upper_t_limit:
+        gt_xranges.append(np.arange(int(max(0, gt_d[4] - 15)), int(gt_d[4] + 15)))
+        gt_yranges.append(np.arange(int(max(0, gt_d[3] - 15)), int(gt_d[3] + 15)))
+        gt_tranges.append([int(max(0, gt_d[2] - 20000)), int(gt_d[2] + 500000)])
+xranges = gt_xranges
+yranges = gt_yranges
+tranges = gt_tranges
 """
-
-upper_t_limit = 50000000 # 50sec
 
 data = np.load(new_filename)
 xs = data['x']
@@ -88,7 +93,7 @@ tranges = [[0, 500000],
            [12800000, 14000000],
            ]
 """
-
+"""
 #signal excluded ROIs
 xranges = [np.arange(0, 45),
            np.arange(0, 45)
@@ -99,14 +104,18 @@ yranges = [np.arange(0, 45),
 tranges = [[0, 10000000],
            [0, 10000000],
            ]
-
-
-for xrange, yrange, trange in zip(xranges, yranges, tranges):
+"""
+"""
+for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
+    print(f"{iii} / {len(xranges)}")
     for arr_x, arr_y in product(xrange, yrange):
         indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
 
         target_ts = ts[indices].astype(np.int32)
         target_ps = ps[indices].astype(np.int32)
+        print(arr_x, arr_y)
+        print(target_ts)
+        print(target_ps)
 
         roi_ts = np.argwhere((trange[0] < target_ts) & (target_ts < trange[1])).flatten()
         
@@ -119,8 +128,6 @@ for xrange, yrange, trange in zip(xranges, yranges, tranges):
         positive_ts = target_ts[positive_args]
         negative_ts = target_ts[negative_args]
 
-        #if len(target_ts) >= 2:
-        #    target_ts = target_ts[target_ps]
 
         diff_ts = abs(np.diff(target_ts))
         diff_ts_concat.extend(list(diff_ts))
@@ -147,7 +154,7 @@ plt.savefig('2.png')
 plt.show()
 #array_ = xs[:,0]
 
-
+"""
 
 
 """
@@ -168,5 +175,5 @@ np.savez(imagename, data=grid)
 
 data = np.load(imagename)['data'][:10000,:,:]
 print(data, data.dtype)
-tifffile.imwrite(f'eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video.tiff', data=data, imagej=True)
+tifffile.imwrite(f"eve_data/Experimental/2022-12-08/video_{int(timebin / 1000)}ms.tiff", data=data, imagej=True)
 """
