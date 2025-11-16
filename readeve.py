@@ -155,7 +155,7 @@ print(gt_data)
 gt_indices = list(set([d[0] for d in gt_data]))
 registered_gt_indice = []
 for gt_d in gt_data:
-    if gt_d[0] not in registered_gt_indice and gt_d[0] < 999:
+    if gt_d[0] not in registered_gt_indice and gt_d[0] > 999:
         if gt_d[2] / time_div < upper_t_limit:
             #print(gt_d)
             gt_xranges.append(np.arange(int(max(0, gt_d[4] - window_length//2)), int(gt_d[4] + window_length//2 + 1)))
