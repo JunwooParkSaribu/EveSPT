@@ -90,6 +90,27 @@ def decompose_signal_by_time(signal, timebin):
     return np.array(labels)
     
 
+def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_ts):
+    xs = []
+    ys = []
+    ts = []
+    ps = []
+
+    for positive_event_t in positive_event_ts:
+        xs.append(x_pos)
+        ys.append(y_pos)
+        ts.append(positive_event_t)
+        ps.append(1)
+    
+    for negative_event_t in negative_event_ts:
+        xs.append(x_pos)
+        ys.append(y_pos)
+        ts.append(negative_event_t)
+        ps.append(0)
+
+    return xs, ys, ts, ps
+
+
 """
 # Number of sample points
 N = 600
@@ -112,6 +133,7 @@ path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 
 filename = f"{path}/Events.npy"
 new_filename = f"{path}/Events.npz"
 imagename = f"{path}/Events_image.npz"
+filtered_events_name = f"{path}/filtered_events.npz"
 gt = f"{path}/Tracks_GT.npy"
 
 """
@@ -193,6 +215,11 @@ t_max = np.max(ts)
 
 diff_ts_concat = []
 positive_to_negative = []
+filtered_xs = []
+filtered_ys = []
+filtered_ps = []
+filtered_ts = []
+
 """
 #all
 xrange = np.arange(0, 50)
@@ -280,7 +307,8 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #diff_ts_concat.extend(list(diff_ts))
         #print(target_ts, target_ps)
         print(xrange[len(xrange)//2], yrange[len(yrange)//2])
-
+        picked_pos_x = xrange[len(xrange)//2]
+        picekd_pos_y = yrange[len(yrange)//2]
 
         for _ in range(4):
             positive_ts = signal_filter(positive_ts, nb_dense_events, nb_dense_times)
@@ -288,9 +316,13 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         filtered_positives = positive_ts
         filtered_negatives = negative_ts
 
+        xs_tmp, ys_tmp, ts_tmp, ps_tmp = convert_event_to_std_format(picked_pos_x, picekd_pos_y, filtered_positives, filtered_negatives)
+        filtered_xs.extend(xs_tmp)
+        filtered_ys.extend(ys_tmp)
+        filtered_ts.extend(ts_tmp)
+        filtered_ps.extend(ps_tmp)
 
-
-        
+        """
         plt.close('all')
         fig, axs = plt.subplots(2, 1, figsize=(8, 8))
         axs[0].vlines(negative_ts, ymin=-1, ymax=0, colors='red')
@@ -306,7 +338,7 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #xf = fftfreq(len(positive_ts), 100)[:len(positive_ts)//2]
         #plt.figure()
         #plt.plot(xf, 2.0/len(positive_ts) * np.abs(yf[0:len(positive_ts)//2]))
-        
+        """
         
         
         """
@@ -320,7 +352,10 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         if len(filtered_positives) > 1 and len(filtered_negatives) > 1:
             positive_to_negative.extend(signal_mean_diff_time(filtered_positives, filtered_negatives))
 
-        plt.show()
+        #plt.show()
+
+
+np.savez(filtered_events_name, x=filtered_xs, y=filtered_ys, time_stamps=filtered_ts, polarity=filtered_ps)
 
 
 #diff_ts_concat = np.array(diff_ts_concat) / 1000.
