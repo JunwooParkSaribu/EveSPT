@@ -279,7 +279,7 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #diff_ts = abs(np.diff(target_ts))
         #diff_ts_concat.extend(list(diff_ts))
         #print(target_ts, target_ps)
-        print(arr_x, arr_y)
+        print(xrange[len(xrange)//2], yrange[len(yrange)//2])
 
 
         for _ in range(4):
