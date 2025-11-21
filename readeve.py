@@ -151,7 +151,7 @@ gt_data = np.load(gt)
 gt_xranges = []
 gt_yranges = []
 gt_tranges = []
-print(gt_data)
+print(list(gt_data[2000000:2000002]))
 gt_indices = list(set([d[0] for d in gt_data]))
 registered_gt_indice = []
 for gt_d in gt_data:
@@ -226,6 +226,22 @@ tranges = [[0, 10000000],
 
 for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
     print(f"{iii} / {len(xranges)}")
+    """
+    indices_tmp = np.argwhere((xs == 355) & (ys == 272)).flatten()
+    ts_tmp = ts[indices_tmp]
+    ps_tmp = ps[indices_tmp]
+    positive_args = np.argwhere(ps_tmp == 1).flatten()
+    negative_args = np.argwhere(ps_tmp == 0).flatten()
+
+    positive_ts_tmp = ts_tmp[positive_args]
+    negative_ts_tmp = ts_tmp[negative_args]
+    plt.close('all')
+    fig, axs = plt.subplots(2, 1, figsize=(8, 8))
+    axs[0].vlines(negative_ts_tmp, ymin=-1, ymax=0, colors='red')
+    axs[0].vlines(positive_ts_tmp, ymin=0, ymax=1, colors='blue')
+    plt.show()
+    """
+
     #for arr_x, arr_y in product(xrange, yrange):
         #sliding_window_x = np.arange(max(0, arr_x - window_length//2), min(x_max, arr_x + window_length//2), 1)
         #sliding_window_y = np.arange(max(0, arr_y - window_length//2), min(y_max, arr_y + window_length//2), 1)
@@ -326,7 +342,7 @@ plt.show()
 
 
 """
-timebin = 500000
+timebin = 10000
 grid = np.zeros(((int(t_max / timebin) + 1), (y_max + 1), (x_max + 1) * 2), dtype=np.uint8)
 
 for x, y, t, p in zip(xs, ys, ts, ps):
