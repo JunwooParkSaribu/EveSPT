@@ -111,6 +111,30 @@ def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_
     return xs, ys, ts, ps
 
 
+def gridify(gridname, xs, ys, ts, ps, timebin=10000):
+    xmax = np.max(xs)
+    ymax = np.max(ys)
+    tmax = np.max(ts)
+
+    grid = np.zeros(((int(tmax / timebin) + 1), (ymax + 1), (xmax + 1) * 2), dtype=np.uint8)
+
+    for x, y, t, p in zip(xs, ys, ts, ps):
+        polarity = p
+        if polarity == 1:
+            grid[int(t / timebin), y, x] += 1
+        else:
+            grid[int(t / timebin), y, grid.shape[2]//2 + x] += 1
+
+    np.savez(gridname, data=grid)
+
+
+def make_video(path, gridfile, nb_frames, timebin=10000):
+    data = np.load(gridfile)['data'][:nb_frames,:,:]
+    tifffile.imwrite(f"{path}/video_{int(timebin / 1000)}ms.tiff", data=data, imagej=True)
+
+
+
+
 """
 # Number of sample points
 N = 600
@@ -136,6 +160,14 @@ imagename = f"{path}/Events_image.npz"
 filtered_events_name = f"{path}/filtered_events.npz"
 gt = f"{path}/Tracks_GT.npy"
 
+data = np.load(filtered_events_name)
+xs = data['x']
+ys = data['y']
+ts = data['time_stamps'].astype(np.float64)
+ps = data['polarity']
+gridify(f"{path}/filtered_events_image.npz", xs, ys, ts, ps, timebin=10000)
+make_video(path, f"{path}/filtered_events_image.npz", nb_frames=10000, timebin=10000)
+exit()
 """
 data = np.load(filename)
 nb_data = len(data)
