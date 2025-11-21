@@ -290,7 +290,7 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
 
 
 
-        """
+        
         plt.close('all')
         fig, axs = plt.subplots(2, 1, figsize=(8, 8))
         axs[0].vlines(negative_ts, ymin=-1, ymax=0, colors='red')
@@ -306,7 +306,7 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #xf = fftfreq(len(positive_ts), 100)[:len(positive_ts)//2]
         #plt.figure()
         #plt.plot(xf, 2.0/len(positive_ts) * np.abs(yf[0:len(positive_ts)//2]))
-        """
+        
         
         
         """
@@ -320,7 +320,7 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         if len(filtered_positives) > 1 and len(filtered_negatives) > 1:
             positive_to_negative.extend(signal_mean_diff_time(filtered_positives, filtered_negatives))
 
-        #plt.show()
+        plt.show()
 
 
 #diff_ts_concat = np.array(diff_ts_concat) / 1000.
