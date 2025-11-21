@@ -111,7 +111,7 @@ def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_
     return xs, ys, ts, ps
 
 
-def gridify(gridname, xs, ys, ts, ps, timebin=10000):
+def gridify(gridname, xs, ys, ts, ps, timebin=10):
     xmax = np.max(xs)
     ymax = np.max(ys)
     tmax = np.max(ts)
@@ -128,9 +128,9 @@ def gridify(gridname, xs, ys, ts, ps, timebin=10000):
     np.savez(gridname, data=grid)
 
 
-def make_video(path, gridfile, nb_frames, timebin=10000):
+def make_video(path, gridfile, nb_frames, timebin=10):
     data = np.load(gridfile)['data'][:nb_frames,:,:]
-    tifffile.imwrite(f"{path}/video_{int(timebin / 1000)}ms.tiff", data=data, imagej=True)
+    tifffile.imwrite(f"{path}/video_{int(timebin)}ms.tiff", data=data, imagej=True)
 
 
 
@@ -153,6 +153,7 @@ plt.grid()
 plt.show()
 """
 
+
 path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0"
 filename = f"{path}/Events.npy"
 new_filename = f"{path}/Events.npz"
@@ -165,9 +166,12 @@ xs = data['x']
 ys = data['y']
 ts = data['time_stamps'].astype(np.float64)
 ps = data['polarity']
-gridify(f"{path}/filtered_events_image.npz", xs, ys, ts, ps, timebin=10000)
-make_video(path, f"{path}/filtered_events_image.npz", nb_frames=10000, timebin=10000)
-exit()
+
+
+#gridify(f"{path}/filtered_events_image.npz", xs, ys, ts, ps, timebin=10)
+#make_video(path, f"{path}/filtered_events_image.npz", nb_frames=10000, timebin=10)
+
+
 """
 data = np.load(filename)
 nb_data = len(data)
@@ -228,6 +232,7 @@ ys = data['y']
 ts = data['time_stamps'].astype(np.float64) / time_div
 ps = data['polarity']
 
+
 selected_args = np.argwhere(ts < upper_t_limit).flatten()
 xs = xs[selected_args]
 ys = ys[selected_args]
@@ -243,6 +248,15 @@ ys = ys - y_min
 x_max = np.max(xs)
 y_max = np.max(ys)
 t_max = np.max(ts)
+
+
+## do all for every pixels
+xranges = []
+yranges = []
+for x in np.arange(0 + window_length//2, x_max - window_length//2, 1):
+    for y in np.arange(0 + window_length//2, y_max - window_length//2, 1):
+        xranges.append(np.arange(int(max(0, x - window_length//2)), int(x + window_length//2 + 1)))
+        yranges.append(np.arange(int(max(0, y - window_length//2)), int(y+ window_length//2 + 1)))
 
 
 diff_ts_concat = []
@@ -399,10 +413,10 @@ print(positive_to_negative)
 #plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 10))
 #plt.savefig('1.png')
 
-plt.figure()
-plt.hist(positive_to_negative, bins=np.arange(0, 2000, 10))
-plt.savefig('2.png')
-plt.show()
+#plt.figure()
+#plt.hist(positive_to_negative, bins=np.arange(0, 2000, 10))
+#plt.savefig('2.png')
+#plt.show()
 #array_ = xs[:,0]
 
 
