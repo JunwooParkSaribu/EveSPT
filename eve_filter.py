@@ -150,19 +150,49 @@ def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_
     return xs, ys, ts, ps
 
 
-def gridify(gridname, xs, ys, ts, ps, timebin=10):
+def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=200):
     xmax = np.max(xs)
     ymax = np.max(ys)
     tmax = np.max(ts)
 
-    grid = np.zeros(((int(tmax / timebin) + 1), (ymax + 1), (xmax + 1) * 2), dtype=np.uint8)
+    if colorise == False:
+        grid = np.zeros(((int(tmax / timebin) + 1), (ymax + 1), (xmax + 1) * 2), dtype=np.uint8)
+        for x, y, t, p in zip(xs, ys, ts, ps):
+            polarity = p
+            if polarity == 1:
+                grid[int(t / timebin), y, x] += 1
+            else:
+                grid[int(t / timebin), y, grid.shape[2]//2 + x] += 1
 
-    for x, y, t, p in zip(xs, ys, ts, ps):
-        polarity = p
-        if polarity == 1:
-            grid[int(t / timebin), y, x] += 1
-        else:
-            grid[int(t / timebin), y, grid.shape[2]//2 + x] += 1
+    else:
+        grid = np.zeros(((int(tmax / timebin) + 1), (ymax + 1), (xmax + 1) * 2, 3), dtype=np.uint8)
+        for x_target, y_target in product(np.arange(xmax), np.arange(ymax)):
+            if x_target % 100 == 0 and y_target % 100 == 0: print(x_target, y_target)
+            xs_filtered, ys_filtered, ts_filtered, ps_filtered = indice_filter_by_position(x_target, y_target, xs, ys, ts, ps)
+            if len(xs) == 0:
+                continue
+            positive_indices, negative_indices = indice_filter_by_polarity(ps_filtered)
+            positive_xs = xs_filtered[positive_indices]
+            positive_ys = ys_filtered[positive_indices]
+            positive_ts = ts_filtered[positive_indices]
+            negative_xs = xs_filtered[negative_indices]
+            negative_ys = ys_filtered[negative_indices]
+            negative_ts = ts_filtered[negative_indices]
+            if len(positive_ts) == 0 or len(negative_ts) == 0:
+                continue
+            positive_colours, negative_colours = add_colour_by_time_diff(positive_ts, negative_ts, threshold=threshold)
+
+            for x, y, t, rgb in zip(positive_xs, positive_ys, positive_ts, positive_colours):
+                if rgb[0] == 1 and rgb[1] == 0 and rgb[2] == 0:
+                    grid[int(t / timebin), y, x, 0] += 1
+                else:
+                    grid[int(t / timebin), y, x, 2] += 1
+
+            for x, y, t, rgb in zip(negative_xs, negative_ys, negative_ts, negative_colours):
+                if rgb[0] == 1 and rgb[1] == 0 and rgb[2] == 0:
+                    grid[int(t / timebin), y, grid.shape[2]//2 + x, 0] += 1
+                else:
+                    grid[int(t / timebin), y, grid.shape[2]//2 + x, 2] += 1
 
     np.savez(gridname, data=grid)
 
@@ -172,6 +202,43 @@ def make_video(path, gridfile, nb_frames):
     tifffile.imwrite(path, data=data, imagej=True)
 
 
+def read_processed_events(path):
+    assert ".npz" in path
+    data = np.load(path)
+    xs = data['x']
+    ys = data['y']
+    ts = data['time_stamps'].astype(np.float64)
+    ps = data['polarity']
+    return xs, ys, ts, ps
+
+
+def indice_filter_by_polarity(polarities):
+    positive_args = np.argwhere(polarities == 1).flatten()
+    negative_args = np.argwhere(polarities == 0).flatten()
+    return positive_args, negative_args
+
+
+def indice_filter_by_position(x_target, y_target, xs, ys, ts, ps):
+    indices = np.argwhere((xs == x_target) & (ys == y_target)).flatten()
+    return xs[indices], ys[indices], ts[indices], ps[indices]
+
+
+def add_colour_by_time_diff(positive_events, negative_events, threshold):
+    positive_colours = []
+    negative_colours = []
+
+    for positive in positive_events:
+        if np.min(abs(negative_events - positive)) > threshold:
+            positive_colours.append((1, 0, 0))
+        else:
+            positive_colours.append((0, 0, 1))
+
+    for negative in negative_events:
+        if np.min(abs(positive_events - negative)) > threshold:
+            negative_colours.append((1, 0, 0))
+        else:
+            negative_colours.append((0, 0, 1))
+    return positive_colours, negative_colours
 
 
 """
@@ -207,10 +274,25 @@ xs = data['x']
 ys = data['y']
 ts = data['time_stamps'].astype(np.float64)
 ps = data['polarity']
-timebin = 10000 #ms
+timebin = 10 #ms
 gridify(f"{path}/filtered_events_image_{timebin}ms.npz", xs, ys, ts, ps, timebin=timebin)
-make_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image.npz", nb_frames=10000)
+make_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image_{timebin}ms.npz", nb_frames=10000)
+exit()
 """
+
+
+xs, ys, ts, ps = read_processed_events(filtered_events_name)
+#xs, ys, ts, ps = indice_filter_by_position(314, 357, xs, ys, ts, ps)
+#positive_args, negative_args = indice_filter_by_polarity(ps)
+#positive_ts = ts[positive_args]
+#negative_ts = ts[negative_args]
+#mean_diff_t = signal_mean_diff_time(positive_ts, negative_ts)
+#print(mean_diff_t)
+timebin = 10
+gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", xs, ys, ts, ps, timebin=timebin, colorise=True, threshold=200)
+make_video(f"{path}/filtered_video_{timebin}ms_color.tiff", f"{path}/filtered_events_image_{timebin}ms_color.npz", nb_frames=10000)
+exit()
+
 
 
 """
@@ -241,9 +323,9 @@ np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 
 time_div = 1000
 upper_t_limit = 50000 # in ms. 50sec
-window_length = 15
+window_length = 7
 nb_dense_events = 1 * window_length**2
-nb_dense_times = 200
+nb_dense_times = 100
 single_cache = {}
 window_cache = {}
 
@@ -495,27 +577,3 @@ print(positive_to_negative)
 #plt.savefig('2.png')
 #plt.show()
 #array_ = xs[:,0]
-
-
-
-
-"""
-timebin = 10000
-grid = np.zeros(((int(t_max / timebin) + 1), (y_max + 1), (x_max + 1) * 2), dtype=np.uint8)
-
-for x, y, t, p in zip(xs, ys, ts, ps):
-    polarity = p
-    if polarity == 1:
-        grid[int(t / timebin), y, x] += 1
-    else:
-        grid[int(t / timebin), y, grid.shape[2]//2 + x] += 1
-
-
-print(grid.shape)
-np.savez(imagename, data=grid)
-
-
-data = np.load(imagename)['data'][:10000,:,:]
-print(data, data.dtype)
-tifffile.imwrite(f"{path}/video_{int(timebin / 1000)}ms.tiff", data=data, imagej=True)
-"""
