@@ -7,16 +7,55 @@ from sklearn.cluster import OPTICS
 from sklearn.cluster import DBSCAN
 from sklearn.mixture import GaussianMixture
 from scipy.optimize import linear_sum_assignment
+from timeit import default_timer as timer
+import cupy as cp
+import subprocess
+import sys
 
 
 
-def signal_filter(signal_ts, nb=3, time=200):
+def fetch_indices(x_arr, y_arr, x_range, y_range, single_cache):
+    concat_indices = []
+
+    if x_range[0] % 100 == 0 and y_range[0] % 100 == 0:
+        single_cache = {}
+
+    for x_val, y_val in product(x_range, y_range):
+        if (x_val, y_val) not in single_cache:
+            indices = np.argwhere((x_arr == x_val) & (y_arr == y_val)).flatten()
+            single_cache[(x_val, y_val)] = indices
+            concat_indices.extend(indices)
+        else:
+            concat_indices.extend(single_cache[(x_val, y_val)])
+    concat_indices = np.array(concat_indices).flatten()
+    return concat_indices
+
+
+def window_caching(x_arr, y_arr, x_range, y_range, window_cache, single_cache):
+    range_tuple = tuple((x_range[0], x_range[-1], y_range[0], y_range[-1]))
+
+    if x_range[0] % 100 == 0 and y_range[0] % 100 == 0:
+        window_cache = {}
+
+    if range_tuple not in window_cache:
+        indices = fetch_indices(x_arr, y_arr, x_range, y_range, single_cache)
+        window_cache[range_tuple] = indices
+    else:
+        indices = window_cache[range_tuple]
+    return indices
+
+
+def signal_filter(signal_ts, nb=225, time=200):
+    start = timer()
     signal_ts = np.array(signal_ts)
     filtered_signals = []
     for t in signal_ts:
         if len(signal_ts[(signal_ts > t - time) & (signal_ts < t + time)]) >= nb:
             filtered_signals.append(t)
-    return np.array(filtered_signals)
+    filtered_signals = np.array(filtered_signals)
+    end = timer()
+    #print(f"FILLTER 1 : {end-start}, {len(filtered_signals)}") 
+    return filtered_signals
    
 
 def signal_mean_diff_time(signal1, signal2):
@@ -128,9 +167,9 @@ def gridify(gridname, xs, ys, ts, ps, timebin=10):
     np.savez(gridname, data=grid)
 
 
-def make_video(path, gridfile, nb_frames, timebin=10):
+def make_video(path, gridfile, nb_frames):
     data = np.load(gridfile)['data'][:nb_frames,:,:]
-    tifffile.imwrite(f"{path}/video_{int(timebin)}ms.tiff", data=data, imagej=True)
+    tifffile.imwrite(path, data=data, imagej=True)
 
 
 
@@ -168,8 +207,9 @@ xs = data['x']
 ys = data['y']
 ts = data['time_stamps'].astype(np.float64)
 ps = data['polarity']
-gridify(f"{path}/filtered_events_image.npz", xs, ys, ts, ps, timebin=10)
-make_video(path, f"{path}/filtered_events_image.npz", nb_frames=10000, timebin=10)
+timebin = 10000 #ms
+gridify(f"{path}/filtered_events_image_{timebin}ms.npz", xs, ys, ts, ps, timebin=timebin)
+make_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image.npz", nb_frames=10000)
 """
 
 
@@ -200,10 +240,13 @@ np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 
 
 time_div = 1000
-upper_t_limit = 250000 # in ms. 50sec
+upper_t_limit = 50000 # in ms. 50sec
 window_length = 15
 nb_dense_events = 1 * window_length**2
 nb_dense_times = 200
+single_cache = {}
+window_cache = {}
+
 
 gt_data = np.load(gt)
 
@@ -301,7 +344,7 @@ tranges = [[0, 10000000],
 
 
 for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
-    print(f"{iii} / {len(xranges)}")
+    if iii%100 == 0: print(f"{iii} / {len(xranges)}")
     """
     indices_tmp = np.argwhere((xs == 355) & (ys == 272)).flatten()
     ts_tmp = ts[indices_tmp]
@@ -324,15 +367,31 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #for cur_x, cur_y in product(sliding_window_x, sliding_window_y):
         #print(np.argwhere((xs == arr_x)).flatten())
         #print(np.argwhere((xs == np.array(list(xrange)))).flatten())
+    
+    start = timer()
+    #indices = fetch_indices(xs, ys, xrange, yrange, cache)
+    indices = window_caching(xs, ys, xrange, yrange, window_cache, single_cache)
+    end = timer()
+    #print(f"cached indice concatenation: {end-start}", len(indices)) 
+    
+    start = timer()
+
+    """
     concat_indices = []
     for arr_x, arr_y in product(xrange, yrange):
         indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
         concat_indices.extend(list(indices))
     concat_indices = np.array(concat_indices)
     indices = concat_indices
+    """
+
+    end = timer()
+    #print(f"indice concatenation: {end-start}", len(indices)) 
     for _ in range(1):
         
         #indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
+        start = timer()
+
 
         target_ts = ts[indices].astype(np.float64)
         target_ps = ps[indices].astype(np.int16)
@@ -352,18 +411,29 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         negative_ts = target_ts[negative_args]
 
 
+        end = timer()
+        #print(f"argwhere : {end-start}") 
+
         #diff_ts = abs(np.diff(target_ts))
         #diff_ts_concat.extend(list(diff_ts))
         #print(target_ts, target_ps)
-        print(xrange[len(xrange)//2], yrange[len(yrange)//2])
+        #print(xrange[len(xrange)//2], yrange[len(yrange)//2])
         picked_pos_x = xrange[len(xrange)//2]
         picekd_pos_y = yrange[len(yrange)//2]
 
+
+        start = timer()
         for _ in range(4):
             positive_ts = signal_filter(positive_ts, nb_dense_events, nb_dense_times)
             negative_ts = signal_filter(negative_ts, nb_dense_events, nb_dense_times)
         filtered_positives = positive_ts
         filtered_negatives = negative_ts
+
+
+
+        end = timer()
+        #print(f"filtering : {end-start}") 
+        start = timer()
 
         xs_tmp, ys_tmp, ts_tmp, ps_tmp = convert_event_to_std_format(picked_pos_x, picekd_pos_y, filtered_positives, filtered_negatives)
         filtered_xs.extend(xs_tmp)
@@ -400,6 +470,10 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #    positive_to_negative.append(filtered_negatives[0] - filtered_positives[-1])
         if len(filtered_positives) > 1 and len(filtered_negatives) > 1:
             positive_to_negative.extend(signal_mean_diff_time(filtered_positives, filtered_negatives))
+        
+        
+        end = timer()
+        #print(f"Rest : {end-start}") 
 
         #plt.show()
 
