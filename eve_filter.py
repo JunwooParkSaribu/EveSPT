@@ -328,10 +328,20 @@ exit()
 
 time_div = 1000  # us to ms for original data
 timebin = 10
+upper_t_limit = 50000 # in ms. 50sec
+
 original_data = np.load(new_filename)
-xmax = np.max(original_data['x'])
-ymax = np.max(original_data['y'])
-tmax = np.max(original_data['time_stamps'].astype(np.float64) / time_div)
+xs = original_data['x']
+ys = original_data['y']
+ts = original_data['time_stamps'].astype(np.float64) / time_div
+selected_args = np.argwhere(ts < upper_t_limit).flatten()
+xs = xs[selected_args]
+ys = ys[selected_args]
+ts = ts[selected_args]
+xmax = np.max(xs)
+ymax = np.max(ys)
+tmax = np.max(ts)
+
 filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_processed_events(filtered_events_name)
 time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=True, threshold=200, xmax=xmax, ymax=ymax, tmax=tmax)
 make_video(f"{path}/filtered_video_{timebin}ms_color.tiff", f"{path}/filtered_events_image_{timebin}ms_color.npz", nb_frames=10000)
