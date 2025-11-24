@@ -11,6 +11,7 @@ from timeit import default_timer as timer
 import cupy as cp
 import subprocess
 import sys
+import networkx as nx
 
 
 
@@ -56,6 +57,26 @@ def signal_filter(signal_ts, nb=225, time=200):
     end = timer()
     #print(f"FILLTER 1 : {end-start}, {len(filtered_signals)}") 
     return filtered_signals
+
+
+def pairing(arr1, arr2):
+    B = nx.Graph()
+    B.add_nodes_from(arr1, bipartite=0)
+    B.add_nodes_from(arr2, bipartite=1)
+
+    for arr1_val, arr2_val in product(arr1, arr2):
+        if not B.has_edge(arr1_val, arr2_val):
+            if arr1_val - arr2_val < 0:
+                B.add_edge(arr1_val, arr2_val, weight=abs(arr1_val - arr2_val))
+
+    B.remove_nodes_from(list(nx.isolates(B)))
+    left, right = nx.bipartite.sets(B)
+    matches = nx.algorithms.bipartite.minimum_weight_full_matching(B,  top_nodes=None, weight='weight')
+
+    left_to_right_matches = {l:(matches[l], B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
+
+    # dict with {left: (right, weight)}
+    return left_to_right_matches
    
 
 def signal_mean_diff_time(signal1, signal2):
@@ -93,21 +114,13 @@ def signal_mean_diff_time(signal1, signal2):
     mean_times2 = np.array(mean_times2)
 
     selected_nb_cluster = min(len(np.unique(labels1[labels1 > -1])), len(np.unique(labels2[labels2 > -1])))
+
     time_diffs = []
     print(mean_times1, mean_times2)
-    if len(mean_times1) == len(mean_times2):
-        time_diffs.extend(list(abs(mean_times2 - mean_times1)))
-    else:
-        for mean_time1, mean_time2 in product(mean_times1, mean_times2):
-            time_diffs.append(abs(mean_time2 - mean_time1))
-    #time_diffs = abs(mean_times2 - mean_times1)
+    matches = pairing(mean_times1, mean_times2)
+    time_diffs.append(matches[l][1] for l in matches)
 
-    #print(mean_times1, mean_times2)
-    #row_ind, col_ind = linear_sum_assignment(np.array([mean_times1, mean_times2]))
-    #print(mean_times1, mean_times2, row_ind, col_ind)
-    time_diffs = np.sort(time_diffs)
-    print(time_diffs[:selected_nb_cluster])
-    return list(time_diffs[:selected_nb_cluster])
+    return time_diffs
 
 
 def decompose_signal_by_time(signal, timebin):
