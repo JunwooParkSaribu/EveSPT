@@ -75,9 +75,19 @@ def pairing(arr1, arr2):
     assert bipartite.is_bipartite(B)
     B.remove_nodes_from(list(nx.isolates(B)))
     left, right = nx.bipartite.sets(B)
-    matches = bipartite.minimum_weight_full_matching(B,  top_nodes=None, weight='weight')
 
-    left_to_right_matches = {int(l[-1]):(int(matches[l][-1]), B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
+    #matches = bipartite.minimum_weight_full_matching(B,  top_nodes=None, weight='weight')
+    #left_to_right_matches = {int(l[-1]):(int(matches[l][-1]), B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
+
+    matches = nx.algorithms.min_weight_matching(B, weight='weight')
+    reformatted_matches = {}
+    for edge in matches:
+        n1, n2 = edge
+        if 'l' in n1 and 'r' in n2:
+            reformatted_matches[n1] = n2
+        if 'r' in n1 and 'l' in n2:
+            reformatted_matches[n2] = n1
+    left_to_right_matches = {int(l[-1]):(int(reformatted_matches[l][-1]), B.get_edge_data(l, reformatted_matches[l], None)['weight']) for l in left if l in reformatted_matches}
 
     # dict with {left_index: (right_index, weight)}
     return left_to_right_matches
