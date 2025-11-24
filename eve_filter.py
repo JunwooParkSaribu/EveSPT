@@ -71,7 +71,9 @@ def pairing(arr1, arr2):
         if not B.has_edge(f"l_{arr1_l}", f"r_{arr2_l}"):
             if arr1[arr1_l] - arr2[arr2_l] < 0:
                 B.add_edge(f"l_{arr1_l}", f"r_{arr2_l}", weight=abs(arr1[arr1_l] - arr2[arr2_l]))
-
+    
+    if len(B.edges) == 0:
+        return {}
     assert bipartite.is_bipartite(B)
     B.remove_nodes_from(list(nx.isolates(B)))
     left, right = nx.bipartite.sets(B)
@@ -118,8 +120,10 @@ def signal_mean_diff_time(signal1, signal2):
     time_diffs = []
     print(mean_times1, mean_times2)
     matches = pairing(mean_times1, mean_times2)
+    if len(matches) == 0:
+        return [], {}, labels1, labels2
+    
     time_diffs.append(matches[l][1] for l in matches)
-
     return time_diffs, matches, labels1, labels2
 
 
