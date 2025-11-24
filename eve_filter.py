@@ -12,6 +12,7 @@ import cupy as cp
 import subprocess
 import sys
 import networkx as nx
+from networkx.algorithms import bipartite
 
 
 
@@ -63,44 +64,31 @@ def pairing(arr1, arr2):
     arr1_labels = np.arange(len(arr1))
     arr2_labels = np.arange(len(arr2))
     B = nx.Graph()
-    B.add_nodes_from(arr1_labels, bipartite=0)
-    B.add_nodes_from(arr2_labels, bipartite=1)
+    B.add_nodes_from([f"l_{l}" for l in arr1_labels], bipartite=0)
+    B.add_nodes_from([f"r_{r}" for r in arr2_labels], bipartite=1)
 
     for arr1_l, arr2_l in product(arr1_labels, arr2_labels):
-        if not B.has_edge(arr1_l, arr2_l):
+        if not B.has_edge(f"l_{arr1_l}", f"r_{arr2_l}"):
             if arr1[arr1_l] - arr2[arr2_l] < 0:
-                B.add_edge(arr1_l, arr2_l, weight=abs(arr1[arr1_l] - arr2[arr2_l]))
+                B.add_edge(f"l_{arr1_l}", f"r_{arr2_l}", weight=abs(arr1[arr1_l] - arr2[arr2_l]))
 
+    assert bipartite.is_bipartite(B)
     B.remove_nodes_from(list(nx.isolates(B)))
     left, right = nx.bipartite.sets(B)
-    matches = nx.algorithms.bipartite.minimum_weight_full_matching(B,  top_nodes=None, weight='weight')
+    matches = bipartite.minimum_weight_full_matching(B,  top_nodes=None, weight='weight')
 
-    left_to_right_matches = {l:(matches[l], B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
+    left_to_right_matches = {int(l[-1]):(int(matches[l][-1]), B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
 
     # dict with {left_index: (right_index, weight)}
     return left_to_right_matches
-   
+
 
 def signal_mean_diff_time(signal1, signal2):
-    #clustering1_ = OPTICS(min_samples=2).fit(signal1.reshape(-1, 1))
-    #clustering2_ = OPTICS(min_samples=2).fit(signal2.reshape(-1, 1))
-    #clustering1 = DBSCAN(eps=3, min_samples=2).fit(signal1.reshape(-1, 1))
-    #clustering2 = DBSCAN(eps=3, min_samples=2).fit(signal1.reshape(-1, 1))
-    #clustering1 = GaussianMixture(n_components=2, random_state=0).fit(signal1.reshape(-1, 1))
-    #clustering2 = GaussianMixture(n_components=2, random_state=0).fit(signal2.reshape(-1, 1))
-    
-    #print(signal1, clustering1.predict(signal1.reshape(-1, 1)))
-    #print(signal2, clustering2.predict(signal2.reshape(-1, 1)))
-    #labels1 = clustering1.predict(signal1.reshape(-1, 1))
-    #labels2 = clustering2.predict(signal2.reshape(-1, 1))
-
     signal1 = np.sort(signal1)
     signal2 = np.sort(signal2)
-    labels1 = decompose_signal_by_time(signal1, timebin=5000)
-    labels2 = decompose_signal_by_time(signal2, timebin=5000)
+    labels1 = signal_labeling(signal1, timebin=100)
+    labels2 = signal_labeling(signal2, timebin=100)
 
-    #print(signal1, labels1)
-    #print(signal2, labels2)
     mean_times1 = []
     for label in np.unique(labels1):
         arg_ = np.argwhere(labels1 == label).flatten()
@@ -125,22 +113,13 @@ def signal_mean_diff_time(signal1, signal2):
     return time_diffs, matches, labels1, labels2
 
 
-def decompose_signal_by_time(signal, timebin):
-    decomposed_signals = []
+def signal_labeling(signal, timebin):
     labels = []
     label_init = 0
-    #for t_gap in np.arange(0, np.max(signal), timebin):
-        #decomp_signal = np.where(signal[(signal > t_gap) & (signal < t_gap + timebin)]).flatten()
-        #labels.extend([label_init] * len(signal[(signal > t_gap) & (signal < t_gap + timebin)]))
-        #label_init += 1
-        #decomposed_signals.append(decomp_signal)
-    #signal = np.sort(signal)
     for sig_idx in range(len(signal) - 1):
-
         labels.append(label_init)
-        if signal[sig_idx+1] - signal[sig_idx] > 100:
+        if signal[sig_idx+1] - signal[sig_idx] > timebin:
             label_init += 1
-    #print(labels)
     return np.array(labels)
     
 
