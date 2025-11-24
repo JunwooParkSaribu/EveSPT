@@ -60,14 +60,16 @@ def signal_filter(signal_ts, nb=225, time=200):
 
 
 def pairing(arr1, arr2):
+    arr1_labels = np.arange(len(arr1))
+    arr2_labels = np.arange(len(arr2))
     B = nx.Graph()
-    B.add_nodes_from(arr1, bipartite=0)
-    B.add_nodes_from(arr2, bipartite=1)
+    B.add_nodes_from(arr1_labels, bipartite=0)
+    B.add_nodes_from(arr2_labels, bipartite=1)
 
-    for arr1_val, arr2_val in product(arr1, arr2):
-        if not B.has_edge(arr1_val, arr2_val):
-            if arr1_val - arr2_val < 0:
-                B.add_edge(arr1_val, arr2_val, weight=abs(arr1_val - arr2_val))
+    for arr1_l, arr2_l in product(arr1_labels, arr2_labels):
+        if not B.has_edge(arr1_l, arr2_l):
+            if arr1[arr1_l] - arr2[arr2_l] < 0:
+                B.add_edge(arr1_l, arr2_l, weight=abs(arr1[arr1_l] - arr2[arr2_l]))
 
     B.remove_nodes_from(list(nx.isolates(B)))
     left, right = nx.bipartite.sets(B)
@@ -75,7 +77,7 @@ def pairing(arr1, arr2):
 
     left_to_right_matches = {l:(matches[l], B.get_edge_data(l, matches[l], None)['weight']) for l in left if l in matches}
 
-    # dict with {left: (right, weight)}
+    # dict with {left_index: (right_index, weight)}
     return left_to_right_matches
    
 
@@ -120,7 +122,7 @@ def signal_mean_diff_time(signal1, signal2):
     matches = pairing(mean_times1, mean_times2)
     time_diffs.append(matches[l][1] for l in matches)
 
-    return time_diffs
+    return time_diffs, matches, labels1, labels2
 
 
 def decompose_signal_by_time(signal, timebin):
@@ -163,10 +165,14 @@ def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_
     return xs, ys, ts, ps
 
 
-def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=200):
-    xmax = np.max(xs)
-    ymax = np.max(ys)
-    tmax = np.max(ts)
+def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=200, xmax=-1, ymax=-1, tmax=-1):
+    total_time_diffs = []
+    if xmax==-1:
+        xmax = np.max(xs)
+    if ymax==-1:
+        ymax = np.max(ys)
+    if tmax==-1:
+        tmax = np.max(ts)
 
     if colorise == False:
         grid = np.zeros(((int(tmax / timebin) + 1), (ymax + 1), (xmax + 1) * 2), dtype=np.uint8)
@@ -193,21 +199,27 @@ def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=200)
             negative_ts = ts_filtered[negative_indices]
             if len(positive_ts) == 0 or len(negative_ts) == 0:
                 continue
-            positive_colours, negative_colours = add_colour_by_time_diff(positive_ts, negative_ts, threshold=threshold)
+            positive_colours, negative_colours, time_diffs = add_colour_by_time_diff(positive_ts, negative_ts, threshold=threshold)
+            total_time_diffs.extend(time_diffs)
 
             for x, y, t, rgb in zip(positive_xs, positive_ys, positive_ts, positive_colours):
                 if rgb[0] == 1 and rgb[1] == 0 and rgb[2] == 0:
                     grid[int(t / timebin), y, x, 0] += 1
+                elif rgb[0] == 0 and rgb[1] == 1 and rgb[2] == 0:
+                    grid[int(t / timebin), y, x, 1] += 1
                 else:
                     grid[int(t / timebin), y, x, 2] += 1
 
             for x, y, t, rgb in zip(negative_xs, negative_ys, negative_ts, negative_colours):
                 if rgb[0] == 1 and rgb[1] == 0 and rgb[2] == 0:
                     grid[int(t / timebin), y, grid.shape[2]//2 + x, 0] += 1
+                elif rgb[0] ==0 and rgb[1] == 1 and rgb[2] == 0:
+                    grid[int(t / timebin), y, grid.shape[2]//2 + x, 1] += 1
                 else:
                     grid[int(t / timebin), y, grid.shape[2]//2 + x, 2] += 1
 
     np.savez(gridname, data=grid)
+    return total_time_diffs
 
 
 def make_video(path, gridfile, nb_frames):
@@ -236,22 +248,43 @@ def indice_filter_by_position(x_target, y_target, xs, ys, ts, ps):
     return xs[indices], ys[indices], ts[indices], ps[indices]
 
 
+def inverse_bipartitie_graph(graph:dict):
+    new_graph = {}
+    ls = list(graph.keys())
+    for l in ls:
+        r, val = graph[l]
+        new_graph[r] = (l, val)
+    return new_graph
+
+
 def add_colour_by_time_diff(positive_events, negative_events, threshold):
     positive_colours = []
     negative_colours = []
 
-    for positive in positive_events:
-        if np.min(abs(negative_events - positive)) > threshold:
-            positive_colours.append((1, 0, 0))
-        else:
-            positive_colours.append((0, 0, 1))
+    time_diffs, matches, positive_labels, negative_labels = signal_mean_diff_time(positive_events, negative_events)
+    inversed_matches = inverse_bipartitie_graph(matches)
 
-    for negative in negative_events:
-        if np.min(abs(positive_events - negative)) > threshold:
-            negative_colours.append((1, 0, 0))
+    for positive_t, positive_label in zip(positive_events, positive_labels):
+        if positive_label in matches:
+            time_diff = matches[positive_label][1]
+            if time_diff > threshold:
+                positive_colours.append((1, 0, 0))
+            else:
+                positive_colours.append((0, 0, 1))
         else:
-            negative_colours.append((0, 0, 1))
-    return positive_colours, negative_colours
+            positive_colours.append((0, 1, 0))
+    
+    for negative_t, negative_label in zip(negative_events, negative_labels):
+        if negative_label in inversed_matches:
+            time_diff = inversed_matches[negative_label][1]
+            if time_diff > threshold:
+                negative_colours.append((1, 0, 0))
+            else:
+                negative_colours.append((0, 0, 1))
+        else:
+            negative_colours.append((0, 1, 0)) 
+
+    return positive_colours, negative_colours, time_diffs
 
 
 """
@@ -293,17 +326,18 @@ make_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_i
 exit()
 """
 
-
-xs, ys, ts, ps = read_processed_events(filtered_events_name)
-#xs, ys, ts, ps = indice_filter_by_position(314, 357, xs, ys, ts, ps)
-#positive_args, negative_args = indice_filter_by_polarity(ps)
-#positive_ts = ts[positive_args]
-#negative_ts = ts[negative_args]
-#mean_diff_t = signal_mean_diff_time(positive_ts, negative_ts)
-#print(mean_diff_t)
+time_div = 1000  # us to ms for original data
 timebin = 10
-gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", xs, ys, ts, ps, timebin=timebin, colorise=True, threshold=200)
+original_data = np.load(new_filename)
+xmax = np.max(original_data['x'])
+ymax = np.max(original_data['y'])
+tmax = np.max(original_data['time_stamps'].astype(np.float64) / time_div)
+filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_processed_events(filtered_events_name)
+time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=True, threshold=200, xmax=xmax, ymax=ymax, tmax=tmax)
 make_video(f"{path}/filtered_video_{timebin}ms_color.tiff", f"{path}/filtered_events_image_{timebin}ms_color.npz", nb_frames=10000)
+plt.figure()
+plt.hist(time_diffs, bins=np.arange(0, 10000, 10))
+plt.savefig('timediffs.png')
 exit()
 
 
