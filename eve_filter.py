@@ -215,7 +215,7 @@ def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=275,
     return total_time_diffs
 
 
-def make_video(path, gridfile, nb_frames):
+def grid_to_video(path, gridfile, nb_frames):
     data = np.load(gridfile)['data'][:nb_frames,:,:]
     tifffile.imwrite(path, data=data, imagej=True)
 
@@ -280,6 +280,47 @@ def add_colour_by_time_diff(positive_events, negative_events, threshold):
     return positive_colours, negative_colours, time_diffs
 
 
+def concatenate_videos(path1, path2):
+    with tifffile.TiffFile(path1) as tif:
+        imgs1 = tif.asarray()
+        axes1 = tif.series[0].axes
+        imagej_metadata1 = tif.imagej_metadata
+
+    with tifffile.TiffFile(path2) as tif:
+        imgs2 = tif.asarray()
+        axes2 = tif.series[0].axes
+        imagej_metadata2 = tif.imagej_metadata
+
+    assert imgs1.shape[0] == imgs2.shape[0]
+    assert imgs1.shape[1] == imgs2.shape[1]
+    assert imgs1.shape[2] == imgs2.shape[2]
+    
+    if len(imgs1.shape) == 3:
+        colored_imgs1 = np.array([imgs1, imgs1, imgs1])
+        colored_imgs1 = np.moveaxis(colored_imgs1, 0, 3)
+    else:
+        colored_imgs1 = imgs1
+    if len(imgs2.shape) == 3:
+        colored_imgs2 = np.array([imgs2, imgs2, imgs2])
+        colored_imgs2 = np.moveaxis(colored_imgs2, 0, 3)
+    else:
+        colored_imgs2 = imgs2
+
+    concat_imgs = np.concatenate([colored_imgs1, colored_imgs2], axis=1)
+    return concat_imgs
+
+
+def save_video(path, img_sequence):
+    tifffile.imwrite(path, data=img_sequence, imagej=True)
+
+
+"""
+concat_imgs = concatenate_videos(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms.tiff", f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms_color_275thres.tiff")
+save_video(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms_275thres_concat.tiff", concat_imgs)
+exit()
+"""
+
+
 """
 # Number of sample points
 N = 600
@@ -299,7 +340,7 @@ plt.show()
 """
 
 
-path = f"eve_data/Experimental/2022-12-08"
+path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0"
 filename = f"{path}/Events.npy"
 new_filename = f"{path}/Events.npz"
 imagename = f"{path}/Events_image.npz"
@@ -310,7 +351,7 @@ gt = f"{path}/Tracks_GT.npy"
 
 
 time_div = 1000  # us to ms for original data
-timebin = 1000
+timebin = 10
 upper_t_limit = 50000 # in ms. 50sec
 
 original_data = np.load(new_filename)
@@ -326,11 +367,11 @@ ymax = np.max(ys)
 tmax = np.max(ts)
 
 filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_processed_events(filtered_events_name)
-time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=True, threshold=275, xmax=xmax, ymax=ymax, tmax=tmax)
-make_video(f"{path}/filtered_video_{timebin}ms_color.tiff", f"{path}/filtered_events_image_{timebin}ms_color.npz", nb_frames=10000)
-plt.figure()
-plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
-plt.savefig('timediffs.png')
+time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=False, threshold=275, xmax=xmax, ymax=ymax, tmax=tmax)
+grid_to_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image_{timebin}ms.npz", nb_frames=10000)
+#plt.figure()
+#plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
+#plt.savefig('timediffs.png')
 exit()
 
 
