@@ -299,7 +299,7 @@ plt.show()
 """
 
 
-path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0"
+path = f"eve_data/Experimental/2022-12-08"
 filename = f"{path}/Events.npy"
 new_filename = f"{path}/Events.npz"
 imagename = f"{path}/Events_image.npz"
@@ -307,20 +307,10 @@ filtered_events_name = f"{path}/filtered_events.npz"
 gt = f"{path}/Tracks_GT.npy"
 
 
-"""
-data = np.load(filtered_events_name)
-xs = data['x']
-ys = data['y']
-ts = data['time_stamps'].astype(np.float64)
-ps = data['polarity']
-timebin = 10 #ms
-gridify(f"{path}/filtered_events_image_{timebin}ms.npz", xs, ys, ts, ps, timebin=timebin)
-make_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image_{timebin}ms.npz", nb_frames=10000)
-exit()
-"""
+
 
 time_div = 1000  # us to ms for original data
-timebin = 10
+timebin = 100
 upper_t_limit = 50000 # in ms. 50sec
 
 original_data = np.load(new_filename)
@@ -342,6 +332,7 @@ plt.figure()
 plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
 plt.savefig('timediffs.png')
 exit()
+
 
 
 
@@ -380,8 +371,9 @@ single_cache = {}
 window_cache = {}
 
 
-gt_data = np.load(gt)
 
+"""
+gt_data = np.load(gt)
 gt_xranges = []
 gt_yranges = []
 gt_tranges = []
@@ -400,6 +392,8 @@ print(registered_gt_indice)
 xranges = gt_xranges
 yranges = gt_yranges
 tranges = gt_tranges
+"""
+
 
 
 data = np.load(new_filename)
