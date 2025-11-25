@@ -8,7 +8,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.mixture import GaussianMixture
 from scipy.optimize import linear_sum_assignment
 from timeit import default_timer as timer
-import cupy as cp
+#import cupy as cp
 import subprocess
 import sys
 import networkx as nx
@@ -295,16 +295,19 @@ def concatenate_videos(path1, path2):
     assert imgs1.shape[1] == imgs2.shape[1]
     assert imgs1.shape[2] == imgs2.shape[2]
     
-    if len(imgs1.shape) == 3:
-        colored_imgs1 = np.array([imgs1, imgs1, imgs1])
-        colored_imgs1 = np.moveaxis(colored_imgs1, 0, 3)
+    if len(imgs1.shape) == 3 and len(imgs2.shape) == 3:
+        return np.concatenate([imgs1, imgs2], axis=1)
     else:
-        colored_imgs1 = imgs1
-    if len(imgs2.shape) == 3:
-        colored_imgs2 = np.array([imgs2, imgs2, imgs2])
-        colored_imgs2 = np.moveaxis(colored_imgs2, 0, 3)
-    else:
-        colored_imgs2 = imgs2
+        if len(imgs1.shape) == 3:
+            colored_imgs1 = np.array([imgs1, imgs1, imgs1])
+            colored_imgs1 = np.moveaxis(colored_imgs1, 0, 3)
+        else:
+            colored_imgs1 = imgs1
+        if len(imgs2.shape) == 3:
+            colored_imgs2 = np.array([imgs2, imgs2, imgs2])
+            colored_imgs2 = np.moveaxis(colored_imgs2, 0, 3)
+        else:
+            colored_imgs2 = imgs2
 
     concat_imgs = np.concatenate([colored_imgs1, colored_imgs2], axis=1)
     return concat_imgs
@@ -315,8 +318,8 @@ def save_video(path, img_sequence):
 
 
 """
-concat_imgs = concatenate_videos(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms.tiff", f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms_color_275thres.tiff")
-save_video(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms_275thres_concat.tiff", concat_imgs)
+concat_imgs = concatenate_videos(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms.tiff", f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms.tiff")
+save_video(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms_concat_for_filtering.tiff", concat_imgs)
 exit()
 """
 
