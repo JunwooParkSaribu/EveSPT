@@ -310,7 +310,7 @@ gt = f"{path}/Tracks_GT.npy"
 
 
 time_div = 1000  # us to ms for original data
-timebin = 100
+timebin = 1000
 upper_t_limit = 50000 # in ms. 50sec
 
 original_data = np.load(new_filename)
