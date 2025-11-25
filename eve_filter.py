@@ -158,7 +158,7 @@ def convert_event_to_std_format(x_pos, y_pos, positive_event_ts, negative_event_
     return xs, ys, ts, ps
 
 
-def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=300, xmax=-1, ymax=-1, tmax=-1):
+def gridify(gridname, xs, ys, ts, ps, timebin=10, colorise=False, threshold=275, xmax=-1, ymax=-1, tmax=-1):
     total_time_diffs = []
     if xmax==-1:
         xmax = np.max(xs)
@@ -336,7 +336,7 @@ ymax = np.max(ys)
 tmax = np.max(ts)
 
 filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_processed_events(filtered_events_name)
-time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=True, threshold=300, xmax=xmax, ymax=ymax, tmax=tmax)
+time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms_color.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=True, threshold=275, xmax=xmax, ymax=ymax, tmax=tmax)
 make_video(f"{path}/filtered_video_{timebin}ms_color.tiff", f"{path}/filtered_events_image_{timebin}ms_color.npz", nb_frames=10000)
 plt.figure()
 plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
