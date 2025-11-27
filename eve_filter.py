@@ -220,7 +220,7 @@ def grid_to_video(path, gridfile, nb_frames):
     tifffile.imwrite(path, data=data, imagej=True)
 
 
-def read_processed_events(path):
+def read_filtered_events(path):
     assert ".npz" in path
     data = np.load(path)
     xs = data['x']
@@ -317,262 +317,74 @@ def save_video(path, img_sequence):
     tifffile.imwrite(path, data=img_sequence, imagej=True)
 
 
-"""
-concat_imgs = concatenate_videos(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms.tiff", f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms.tiff")
-save_video(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms_concat_for_filtering.tiff", concat_imgs)
-exit()
-"""
+def convert_clements_npy_to_npz(npy_path, npz_path):
+    data = np.load(npy_path)
+    nb_data = len(data)
+    polarity = np.empty(nb_data, dtype=np.bool_)
+    time_stamps = np.empty(nb_data, dtype=np.uint32)
+    xs = np.empty(nb_data, dtype=np.uint16)
+    ys = np.empty(nb_data, dtype=np.uint16)
+
+    def fun(data):
+        cnt = 0
+        len_data = len(data)
+        while cnt < len_data:
+            yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
+            cnt += 1
+
+    #for idx, (x, y, p, t) in enumerate(fun(data)):
+    for idx, (p, t, y, x) in enumerate(fun(data)):
+        polarity[idx] = p
+        time_stamps[idx] = t
+        ys[idx] = y
+        xs[idx] = x
+    np.savez(npz_path, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
 
 
-"""
-# Number of sample points
-N = 600
-# sample spacing
-T = 1.0 / 800.0
-x = np.linspace(0.0, N*T, N, endpoint=False)
-y = np.sin(50.0 * 2.0*np.pi*x) + 0.5*np.sin(80.0 * 2.0*np.pi*x)
-yf = fft(y)
-xf = fftfreq(N, T)[:N//2]
+def read_npz_events(path, time_div=1000, upper_t_limit=9999999999):
+    data = np.load(path)
+    xs = data['x']
+    ys = data['y']
+    ts = data['time_stamps'].astype(np.float64) / time_div  # us to ms
+    ps = data['polarity']
 
-plt.figure()
-plt.plot(x, y)
-plt.figure()
-plt.plot(xf, 2.0/N * np.abs(yf[0:N//2]))
-plt.grid()
-plt.show()
-"""
+    selected_args = np.argwhere(ts < upper_t_limit).flatten()
+    xs = xs[selected_args]
+    ys = ys[selected_args]
+    ts = ts[selected_args]
+    ps = ps[selected_args]
+
+    return xs, ys, ts, ps
 
 
-path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0"
-filename = f"{path}/Events.npy"
-new_filename = f"{path}/Events.npz"
-imagename = f"{path}/Events_image.npz"
-filtered_events_name = f"{path}/filtered_events.npz"
-gt = f"{path}/Tracks_GT.npy"
+def simple_filtering(filtered_event_name, xs, ys, ts, ps, window_length=7, nb_dense_time=100):
+    nb_dense_events = 1 * window_length**2
+    single_cache = {}
+    window_cache = {}
 
+    x_max = np.max(xs)
+    y_max = np.max(ys)
 
+    xranges = []
+    yranges = []
+    for x in np.arange(0 + window_length//2, x_max - window_length//2, 1):
+        for y in np.arange(0 + window_length//2, y_max - window_length//2, 1):
+            xranges.append(np.arange(int(max(0, x - window_length//2)), int(x + window_length//2 + 1)))
+            yranges.append(np.arange(int(max(0, y - window_length//2)), int(y + window_length//2 + 1)))
 
+    diff_ts_concat = []
+    positive_to_negative = []
+    filtered_xs = []
+    filtered_ys = []
+    filtered_ps = []
+    filtered_ts = []
 
-time_div = 1000  # us to ms for original data
-timebin = 10
-upper_t_limit = 50000 # in ms. 50sec
-
-original_data = np.load(new_filename)
-xs = original_data['x']
-ys = original_data['y']
-ts = original_data['time_stamps'].astype(np.float64) / time_div
-selected_args = np.argwhere(ts < upper_t_limit).flatten()
-xs = xs[selected_args]
-ys = ys[selected_args]
-ts = ts[selected_args]
-xmax = np.max(xs)
-ymax = np.max(ys)
-tmax = np.max(ts)
-
-filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_processed_events(filtered_events_name)
-time_diffs = gridify(f"{path}/filtered_events_image_{timebin}ms.npz", filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=False, threshold=275, xmax=xmax, ymax=ymax, tmax=tmax)
-grid_to_video(f"{path}/filtered_video_{timebin}ms.tiff", f"{path}/filtered_events_image_{timebin}ms.npz", nb_frames=10000)
-#plt.figure()
-#plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
-#plt.savefig('timediffs.png')
-exit()
-
-
-
-
-"""
-data = np.load(filename)
-nb_data = len(data)
-polarity = np.empty(nb_data, dtype=np.bool_)
-time_stamps = np.empty(nb_data, dtype=np.uint32)
-xs = np.empty(nb_data, dtype=np.uint16)
-ys = np.empty(nb_data, dtype=np.uint16)
-print(data.dtype)
-def fun(data):
-    cnt = 0
-    len_data = len(data)
-    while cnt < len_data:
-        yield data[cnt][0], data[cnt][1], data[cnt][2], data[cnt][3]
-        cnt += 1
-
-#for idx, (x, y, p, t) in enumerate(fun(data)):
-for idx, (p, t, y, x) in enumerate(fun(data)):
-    polarity[idx] = p
-    time_stamps[idx] = t
-    ys[idx] = y
-    xs[idx] = x
-np.savez(new_filename, x=xs, y=ys, time_stamps=time_stamps, polarity=polarity)
-"""
-
-
-
-time_div = 1000
-upper_t_limit = 50000 # in ms. 50sec
-window_length = 7
-nb_dense_events = 1 * window_length**2
-nb_dense_times = 100
-single_cache = {}
-window_cache = {}
-
-
-
-"""
-gt_data = np.load(gt)
-gt_xranges = []
-gt_yranges = []
-gt_tranges = []
-print(list(gt_data[2000000:2000002]))
-gt_indices = list(set([d[0] for d in gt_data]))
-registered_gt_indice = []
-for gt_d in gt_data:
-    if gt_d[0] not in registered_gt_indice and gt_d[0] > 999:
-        if gt_d[2] / time_div < upper_t_limit:
-            #print(gt_d)
-            gt_xranges.append(np.arange(int(max(0, gt_d[4] - window_length//2)), int(gt_d[4] + window_length//2 + 1)))
-            gt_yranges.append(np.arange(int(max(0, gt_d[3] - window_length//2)), int(gt_d[3] + window_length//2 + 1)))
-            gt_tranges.append([int(max(0, gt_d[2] / time_div)), int(gt_d[2] / time_div + 3000)])
-            registered_gt_indice.append(gt_d[0])
-print(registered_gt_indice)
-xranges = gt_xranges
-yranges = gt_yranges
-tranges = gt_tranges
-"""
-
-
-
-data = np.load(new_filename)
-xs = data['x']
-ys = data['y']
-ts = data['time_stamps'].astype(np.float64) / time_div
-ps = data['polarity']
-
-
-selected_args = np.argwhere(ts < upper_t_limit).flatten()
-xs = xs[selected_args]
-ys = ys[selected_args]
-ts = ts[selected_args]
-ps = ps[selected_args]
-
-
-x_min = np.min(xs)
-y_min = np.min(ys)
-
-xs = xs - x_min
-ys = ys - y_min
-x_max = np.max(xs)
-y_max = np.max(ys)
-t_max = np.max(ts)
-
-
-## do all for every pixels
-xranges = []
-yranges = []
-tranges = []
-for x in np.arange(0 + window_length//2, x_max - window_length//2, 1):
-    for y in np.arange(0 + window_length//2, y_max - window_length//2, 1):
-        xranges.append(np.arange(int(max(0, x - window_length//2)), int(x + window_length//2 + 1)))
-        yranges.append(np.arange(int(max(0, y - window_length//2)), int(y + window_length//2 + 1)))
-        tranges.append([0, 9999999999999])
-
-
-diff_ts_concat = []
-positive_to_negative = []
-filtered_xs = []
-filtered_ys = []
-filtered_ps = []
-filtered_ts = []
-
-"""
-#all
-xrange = np.arange(0, 50)
-yrange = np.arange(0, 50)
-"""
-"""
-#signal included ROIs
-xranges = [np.arange(348, 364),
-           np.arange(232, 248)
-           ]
-yranges = [np.arange(252, 268),
-           np.arange(113, 129)
-           ]
-tranges = [[0, 500000],
-           [12800000, 14000000],
-           ]
-"""
-"""
-#signal excluded ROIs
-xranges = [np.arange(0, 45),
-           np.arange(0, 45)
-           ]
-yranges = [np.arange(0, 45),
-           np.arange(474, 516)
-           ]
-tranges = [[0, 10000000],
-           [0, 10000000],
-           ]
-"""
-
-
-for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
-    if iii%100 == 0: print(f"{iii} / {len(xranges)}")
-    """
-    indices_tmp = np.argwhere((xs == 355) & (ys == 272)).flatten()
-    ts_tmp = ts[indices_tmp]
-    ps_tmp = ps[indices_tmp]
-    positive_args = np.argwhere(ps_tmp == 1).flatten()
-    negative_args = np.argwhere(ps_tmp == 0).flatten()
-
-    positive_ts_tmp = ts_tmp[positive_args]
-    negative_ts_tmp = ts_tmp[negative_args]
-    plt.close('all')
-    fig, axs = plt.subplots(2, 1, figsize=(8, 8))
-    axs[0].vlines(negative_ts_tmp, ymin=-1, ymax=0, colors='red')
-    axs[0].vlines(positive_ts_tmp, ymin=0, ymax=1, colors='blue')
-    plt.show()
-    """
-
-    #for arr_x, arr_y in product(xrange, yrange):
-        #sliding_window_x = np.arange(max(0, arr_x - window_length//2), min(x_max, arr_x + window_length//2), 1)
-        #sliding_window_y = np.arange(max(0, arr_y - window_length//2), min(y_max, arr_y + window_length//2), 1)
-        #for cur_x, cur_y in product(sliding_window_x, sliding_window_y):
-        #print(np.argwhere((xs == arr_x)).flatten())
-        #print(np.argwhere((xs == np.array(list(xrange)))).flatten())
-    
-    start = timer()
-    #indices = fetch_indices(xs, ys, xrange, yrange, cache)
-    indices = window_caching(xs, ys, xrange, yrange, window_cache, single_cache)
-    end = timer()
-    #print(f"cached indice concatenation: {end-start}", len(indices)) 
-    
-    start = timer()
-
-    """
-    concat_indices = []
-    for arr_x, arr_y in product(xrange, yrange):
-        indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
-        concat_indices.extend(list(indices))
-    concat_indices = np.array(concat_indices)
-    indices = concat_indices
-    """
-
-    end = timer()
-    #print(f"indice concatenation: {end-start}", len(indices)) 
-    for _ in range(1):
-        
-        #indices = np.argwhere((xs == arr_x) & (ys == arr_y)).flatten()
-        start = timer()
-
+    for iii, (xrange, yrange) in enumerate(zip(xranges, yranges)):
+        if iii%100 == 0: print(f"{iii} / {len(xranges)}")
+        indices = window_caching(xs, ys, xrange, yrange, window_cache, single_cache)
 
         target_ts = ts[indices].astype(np.float64)
         target_ps = ps[indices].astype(np.int16)
-        #print(arr_x, arr_y)
-        #print(target_ts)
-        #print(target_ps)
-
-        roi_ts = np.argwhere((trange[0] < target_ts) & (target_ts < trange[1])).flatten()
-        
-        target_ts = target_ts[roi_ts]
-        target_ps = target_ps[roi_ts]
 
         positive_args = np.argwhere(target_ps == 1).flatten()
         negative_args = np.argwhere(target_ps == 0).flatten()
@@ -580,30 +392,14 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         positive_ts = target_ts[positive_args]
         negative_ts = target_ts[negative_args]
 
-
-        end = timer()
-        #print(f"argwhere : {end-start}") 
-
-        #diff_ts = abs(np.diff(target_ts))
-        #diff_ts_concat.extend(list(diff_ts))
-        #print(target_ts, target_ps)
-        #print(xrange[len(xrange)//2], yrange[len(yrange)//2])
         picked_pos_x = xrange[len(xrange)//2]
         picekd_pos_y = yrange[len(yrange)//2]
 
-
-        start = timer()
         for _ in range(4):
-            positive_ts = signal_filter(positive_ts, nb_dense_events, nb_dense_times)
-            negative_ts = signal_filter(negative_ts, nb_dense_events, nb_dense_times)
+            positive_ts = signal_filter(positive_ts, nb_dense_events, nb_dense_time)
+            negative_ts = signal_filter(negative_ts, nb_dense_events, nb_dense_time)
         filtered_positives = positive_ts
         filtered_negatives = negative_ts
-
-
-
-        end = timer()
-        #print(f"filtering : {end-start}") 
-        start = timer()
 
         xs_tmp, ys_tmp, ts_tmp, ps_tmp = convert_event_to_std_format(picked_pos_x, picekd_pos_y, filtered_positives, filtered_negatives)
         filtered_xs.extend(xs_tmp)
@@ -627,41 +423,85 @@ for iii, (xrange, yrange, trange) in enumerate(zip(xranges, yranges, tranges)):
         #xf = fftfreq(len(positive_ts), 100)[:len(positive_ts)//2]
         #plt.figure()
         #plt.plot(xf, 2.0/len(positive_ts) * np.abs(yf[0:len(positive_ts)//2]))
+        plt.show()
         """
-        
-        
-        """
-        for positive_t in positive_ts:
-            for negative_t in negative_ts:
-                if negative_t > positive_t and negative_t < positive_t + 10000:
-                    positive_to_negative.append(negative_t - positive_t)
-        """
-        #if len(filtered_positives) > 0 and len(filtered_negatives) > 0 and filtered_negatives[0] - filtered_positives[-1] > 0:
-        #    positive_to_negative.append(filtered_negatives[0] - filtered_positives[-1])
+
         if len(filtered_positives) > 1 and len(filtered_negatives) > 1:
             positive_to_negative.extend(signal_mean_diff_time(filtered_positives, filtered_negatives))
         
-        
-        end = timer()
-        #print(f"Rest : {end-start}") 
-
-        #plt.show()
+    np.savez(filtered_event_name, x=filtered_xs, y=filtered_ys, time_stamps=filtered_ts, polarity=filtered_ps)
+    return np.array(positive_to_negative, dtype=np.float64)
 
 
-np.savez(filtered_events_name, x=filtered_xs, y=filtered_ys, time_stamps=filtered_ts, polarity=filtered_ps)
 
+timebin = 10
 
-#diff_ts_concat = np.array(diff_ts_concat) / 1000.
-positive_to_negative = np.array(positive_to_negative, dtype=np.float64)
-print(positive_ts, negative_ts)
-print(positive_to_negative)
+path = f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 0.3] background_level=50.0"
+npy_file_name = f"{path}/Events.npy"
+npz_file_name = f"{path}/Events.npz"
+filtered_event_name = f"{path}/filtered_events.npz"
+grid_name = f"{path}/filtered_events_image_{timebin}ms.npz"
+video_name = f"{path}/filtered_video_{timebin}ms.tiff"
+
+convert_clements_npy_to_npz(npy_file_name, npz_file_name)
+xs, ys, ts, ps = read_npz_events(npz_file_name, time_div=1000, upper_t_limit=999999999999)
+xmax = np.max(xs)
+ymax = np.max(ys)
+tmax = np.max(ts)
+positive_to_negative_time_diffs = simple_filtering(filtered_event_name, xs, ys, ts, ps, window_length=7, nb_dense_time=100)
+filtered_xs, filtered_ys, filtered_ts, filtered_ps = read_filtered_events(filtered_event_name)
+gridify(grid_name, filtered_xs, filtered_ys, filtered_ts, filtered_ps, timebin=timebin, colorise=False, threshold=275, xmax=xmax, ymax=ymax, tmax=tmax)
+grid_to_video(video_name, grid_name, nb_frames=10000)
 
 #plt.figure()
-#plt.hist(diff_ts_concat, bins=np.arange(0, 10000, 10))
-#plt.savefig('1.png')
+#plt.hist(list(time_diffs), bins=np.arange(0, 1000, 10))
+#plt.savefig('timediffs.png')
+exit()
 
-#plt.figure()
-#plt.hist(positive_to_negative, bins=np.arange(0, 2000, 10))
-#plt.savefig('2.png')
-#plt.show()
-#array_ = xs[:,0]
+
+
+"""
+concat_imgs = concatenate_videos(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms.tiff", f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/filtered_video_10ms.tiff")
+save_video(f"eve_data/Simulated/2025-02-27/Tracking evb diffusion_coefficient=[0.1, 1.0] background_level=50.0/video_10ms_concat_for_filtering.tiff", concat_imgs)
+exit()
+"""
+
+"""
+gt_data = np.load(gt)
+gt_xranges = []
+gt_yranges = []
+gt_tranges = []
+print(list(gt_data[2000000:2000002]))
+gt_indices = list(set([d[0] for d in gt_data]))
+registered_gt_indice = []
+for gt_d in gt_data:
+    if gt_d[0] not in registered_gt_indice and gt_d[0] > 999:
+        if gt_d[2] / time_div < upper_t_limit:
+            #print(gt_d)
+            gt_xranges.append(np.arange(int(max(0, gt_d[4] - window_length//2)), int(gt_d[4] + window_length//2 + 1)))
+            gt_yranges.append(np.arange(int(max(0, gt_d[3] - window_length//2)), int(gt_d[3] + window_length//2 + 1)))
+            gt_tranges.append([int(max(0, gt_d[2] / time_div)), int(gt_d[2] / time_div + 3000)])
+            registered_gt_indice.append(gt_d[0])
+print(registered_gt_indice)
+xranges = gt_xranges
+yranges = gt_yranges
+tranges = gt_tranges
+"""
+
+"""
+# Number of sample points
+N = 600
+# sample spacing
+T = 1.0 / 800.0
+x = np.linspace(0.0, N*T, N, endpoint=False)
+y = np.sin(50.0 * 2.0*np.pi*x) + 0.5*np.sin(80.0 * 2.0*np.pi*x)
+yf = fft(y)
+xf = fftfreq(N, T)[:N//2]
+
+plt.figure()
+plt.plot(x, y)
+plt.figure()
+plt.plot(xf, 2.0/N * np.abs(yf[0:N//2]))
+plt.grid()
+plt.show()
+"""
