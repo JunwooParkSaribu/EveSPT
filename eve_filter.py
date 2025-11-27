@@ -8,7 +8,6 @@ from sklearn.cluster import DBSCAN
 from sklearn.mixture import GaussianMixture
 from scipy.optimize import linear_sum_assignment
 from timeit import default_timer as timer
-#import cupy as cp
 import subprocess
 import sys
 import networkx as nx
